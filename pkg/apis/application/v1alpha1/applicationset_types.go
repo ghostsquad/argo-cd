@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/argoproj/argo-cd/v2/common"
@@ -59,6 +60,26 @@ func (a *ApplicationSet) RBACName(defaultNS string) string {
 	return security.RBACName(defaultNS, a.Spec.Template.Spec.GetProject(), a.Namespace, a.Name)
 }
 
+// +kubebuilder:validation:Enum=Go;KCL;
+type TemplateStrategyType string
+
+const (
+	TemplateStrategyTypeGo  TemplateStrategyType = "Go"
+	TemplateStrategyTypeKCL TemplateStrategyType = "KCL"
+)
+
+type GoTemplateStrategy struct {
+	TemplateOptions []string `json:"templateOptions" protobuf:"bytes,1,opt,name=templateOptions"`
+}
+
+type KCLTemplateStrategy struct{}
+
+type TemplateStrategy struct {
+	Type TemplateStrategyType `json:"type" protobuf:"bytes,1,opt,name=type"`
+	Go   GoTemplateStrategy   `json:"go" protobuf:"bytes,2,opt,name=go"`
+	KCL  KCLTemplateStrategy  `json:"kcl" protobuf:"bytes,3,opt,name=kcl"`
+}
+
 // ApplicationSetSpec represents a class of application set state.
 type ApplicationSetSpec struct {
 	GoTemplate        bool                        `json:"goTemplate,omitempty" protobuf:"bytes,1,name=goTemplate"`
@@ -72,6 +93,30 @@ type ApplicationSetSpec struct {
 	ApplyNestedSelectors         bool                            `json:"applyNestedSelectors,omitempty" protobuf:"bytes,8,name=applyNestedSelectors"`
 	IgnoreApplicationDifferences ApplicationSetIgnoreDifferences `json:"ignoreApplicationDifferences,omitempty" protobuf:"bytes,9,name=ignoreApplicationDifferences"`
 	TemplatePatch                *string                         `json:"templatePatch,omitempty" protobuf:"bytes,10,name=templatePatch"`
+	TemplateStrategy             TemplateStrategy                `json:"templateStrategy,omitempty" protobuf:"bytes,11,name=templateStrategy"`
+}
+
+func ResolveTemplateStrategy(strategy TemplateStrategy, useGoTemplate bool, goTemplateOptions []string) TemplateStrategy {
+	if !reflect.DeepEqual(strategy, TemplateStrategy{}) {
+		strategy.Go.TemplateOptions = append(strategy.Go.TemplateOptions, goTemplateOptions...)
+		return strategy
+	}
+
+	strategy.Go.TemplateOptions = goTemplateOptions
+
+	if useGoTemplate {
+		strategy.Type = TemplateStrategyTypeGo
+	}
+
+	return strategy
+}
+
+func TemplateStrategyFromLegacyOptions(useGoTemplate bool, goTemplateOptions []string) TemplateStrategy {
+	return ResolveTemplateStrategy(TemplateStrategy{}, useGoTemplate, goTemplateOptions)
+}
+
+func (a *ApplicationSetSpec) GetTemplateStrategy() TemplateStrategy {
+	return ResolveTemplateStrategy(a.TemplateStrategy, a.GoTemplate, a.GoTemplateOptions)
 }
 
 type ApplicationPreservedFields struct {

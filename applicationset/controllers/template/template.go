@@ -35,7 +35,7 @@ func GenerateApplications(logCtx *log.Entry, applicationSetInfo argov1alpha1.App
 			tmplApplication := GetTempApplication(a.Template)
 
 			for _, p := range a.Params {
-				app, err := renderer.RenderTemplateParams(tmplApplication, applicationSetInfo.Spec.SyncPolicy, p, applicationSetInfo.Spec.GoTemplate, applicationSetInfo.Spec.GoTemplateOptions)
+				app, err := renderer.RenderTemplateParamsWithStrategy(tmplApplication, applicationSetInfo.Spec.SyncPolicy, p, applicationSetInfo.Spec.GetTemplateStrategy())
 				if err != nil {
 					logCtx.WithError(err).WithField("params", a.Params).WithField("generator", requestedGenerator).
 						Error("error generating application from params")
@@ -78,7 +78,7 @@ func GenerateApplications(logCtx *log.Entry, applicationSetInfo argov1alpha1.App
 }
 
 func renderTemplatePatch(r utils.Renderer, app *argov1alpha1.Application, applicationSetInfo argov1alpha1.ApplicationSet, params map[string]interface{}) (*argov1alpha1.Application, error) {
-	replacedTemplate, err := r.Replace(*applicationSetInfo.Spec.TemplatePatch, params, applicationSetInfo.Spec.GoTemplate, applicationSetInfo.Spec.GoTemplateOptions)
+	replacedTemplate, err := r.ReplaceWithStrategy(*applicationSetInfo.Spec.TemplatePatch, params, applicationSetInfo.Spec.GetTemplateStrategy())
 	if err != nil {
 		return nil, fmt.Errorf("error replacing values in templatePatch: %w", err)
 	}
